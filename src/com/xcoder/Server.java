@@ -37,7 +37,7 @@ public class Server {
 
 
     private void initAsMaster() throws Exception {
-        out.println("current node : master");
+        out.println("current node:master");
         out.println("port:" + port);
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
@@ -60,7 +60,7 @@ public class Server {
 
 
     private void initAsSlave(){
-        out.println("current node : slave");
+        out.println("current node:slave");
         EventLoopGroup group = new NioEventLoopGroup();
         try {
             Bootstrap bStrap = new Bootstrap()
@@ -69,13 +69,8 @@ public class Server {
                     .handler(new SlaveInitializer());
             bStrap.connect(host, port).sync().channel();
             out.println("slave started!");
-            while(true){
-                // 添加空转，防止slave退出
-            }
         } catch (Exception e) {
             e.printStackTrace();
-        } finally {
-            group.shutdownGracefully();
         }
     }
 
