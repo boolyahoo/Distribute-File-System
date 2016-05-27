@@ -13,17 +13,46 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 import java.io.PrintStream;
 
+import org.apache.commons.cli.*;
+
 public class Server {
-    private int port;
-    private PrintStream out = System.out;
+    private static PrintStream out = System.out;
+    private int port = 8080;
+    private boolean isMaster = true;
 
 
-    public Server(int port) {
-        this.port = port;
+    public Server() {
+
     }
 
 
-    public void run() throws Exception {
+    public void run(String args[]) throws Exception {
+
+        String[] Args0 = {"-h"};
+        String[] Args1 = {"-i", "192.168.1.1", "-p", "8443", "-t", "https"};
+        Option help = new Option("h", "the command help");
+        Option user = OptionBuilder.withArgName("type")
+                .hasArg()
+                .withDescription("target the search type").create("t");
+        // 此处定义参数类似于 java 命令中的 -D<name>=<value>
+        Option property = OptionBuilder.withArgName("property=value")
+                .hasArgs(2)
+                .withValueSeparator()
+                .withDescription("search the objects which have the target property and value").create("D");
+        Options opts = new Options();
+        opts.addOption(help);
+        opts.addOption(user);
+        opts.addOption(property);
+
+
+
+
+
+        //initServer();
+    }
+
+
+    private void initServer() throws Exception{
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
@@ -34,10 +63,7 @@ public class Server {
                     .option(ChannelOption.SO_BACKLOG, 128)
                     .childOption(ChannelOption.SO_KEEPALIVE, true);
             out.println("Server started");
-            // 绑定端口，开始接收进来的连接
             ChannelFuture cFuture = sBoot.bind(port).sync();
-            // 等待服务器 socket 关闭
-            // 在这个例子中，这不会发生，但你可以优雅地关闭你的服务器。
             cFuture.channel().closeFuture().sync();
         } finally {
             workerGroup.shutdownGracefully();
@@ -48,12 +74,12 @@ public class Server {
 
 
     public static void main(String[] args) throws Exception {
-        int port;
-        if (args.length > 0) {
-            port = Integer.parseInt(args[0]);
-        } else {
-            port = 8080;
-        }
-        new Server(port).run();
+        /**
+         * command line
+         * -m : current server runs as a master node
+         * -s : current server runs as a slave node
+         * -p : current server port
+         * */
+        new Server().run(args);
     }
 }

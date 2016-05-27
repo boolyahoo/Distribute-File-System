@@ -68,7 +68,7 @@ public class ServerMessageHandler extends SimpleChannelInboundHandler<String> {
 
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) { // (7)
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         Channel incoming = ctx.channel();
         out.println("Client:" + incoming.remoteAddress() + "exception");
         // 当出现异常就关闭连接
