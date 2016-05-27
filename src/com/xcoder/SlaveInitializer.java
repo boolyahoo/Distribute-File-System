@@ -8,16 +8,12 @@ import io.netty.handler.codec.Delimiters;
 import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
 
-import java.io.PrintStream;
-
 /**
  * Created by booly on 2016/5/26.
- * Server的初始化设置
+ *
  */
+public class SlaveInitializer extends ChannelInitializer<SocketChannel> {
 
-
-public class ServerInitializer extends ChannelInitializer<SocketChannel> {
-    private PrintStream out = System.out;
 
     @Override
     public void initChannel(SocketChannel ch) throws Exception {
@@ -25,7 +21,6 @@ public class ServerInitializer extends ChannelInitializer<SocketChannel> {
         pipeline.addLast("framer", new DelimiterBasedFrameDecoder(8192, Delimiters.lineDelimiter()));
         pipeline.addLast("decoder", new StringDecoder());
         pipeline.addLast("encoder", new StringEncoder());
-        pipeline.addLast("handler", new ServerMessageHandler());
-        out.println("Client:" + ch.remoteAddress() + ":connected");
+        pipeline.addLast("handler", new SlaveMessageHandler());
     }
 }
