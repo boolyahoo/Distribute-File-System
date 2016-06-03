@@ -32,8 +32,8 @@ public class Server {
 
 
     private void initAsMaster() throws Exception {
-        out.println("current node:master");
-        out.println("port:" + port);
+        out.println("current node : master");
+        out.println("port : " + port);
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         ServerBootstrap sBoot = new ServerBootstrap();
@@ -43,19 +43,21 @@ public class Server {
                     .childHandler(new ServerInitializer())
                     .option(ChannelOption.SO_BACKLOG, 128)
                     .childOption(ChannelOption.SO_KEEPALIVE, true);
-            out.println("Server started");
             ChannelFuture cFuture = sBoot.bind(port).sync();
+            out.println("server started");
+            out.println("init master thread ID : " + Thread.currentThread().getId());
             cFuture.channel().closeFuture().sync();
         } finally {
             workerGroup.shutdownGracefully();
             bossGroup.shutdownGracefully();
-            out.println("Server closed");
+            out.println("server closed");
         }
     }
 
 
     private void initAsSlave() {
-        out.println("current node:slave");
+        out.println("current node : slave");
+        out.println("init slave thread ID : " + Thread.currentThread().getId());
         EventLoopGroup group = new NioEventLoopGroup();
         try {
             Bootstrap bStrap = new Bootstrap()
@@ -63,14 +65,11 @@ public class Server {
                     .channel(NioSocketChannel.class)
                     .handler(new SlaveInitializer());
             Channel channel = bStrap.connect(host, port).sync().channel();
-            //向master发送第一条信息，表名自己是slave
+            //向master发送第一条信息，表明自己是slave
             byte type[] = {MSG.HEAD_SLAVE};
-            ChannelFuture cFuture = channel.writeAndFlush(new String(type) + "\n");
-            cFuture.addListener(new ChannelFutureListener() {
-                public void operationComplete(ChannelFuture future) throws Exception {
-                    out.println("slave started successfully!");
-                }
-            });
+            //等待写操作完成
+            channel.writeAndFlush(new String(type) + "\n");
+
         } catch (Exception e) {
             e.printStackTrace();
         }

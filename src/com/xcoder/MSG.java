@@ -5,9 +5,13 @@ package com.xcoder;
  */
 
 public class MSG {
-    public static final int HEAD_MASTER = 0x00; // 00
-    public static final int HEAD_SLAVE = 0x01; // 01
-    public static final int HEAD_CLIENT = 0x02; // 10
-
-
+    public static final byte HEAD_MASTER = 0x00;
+    public static final byte HEAD_SLAVE = 0x01;
+    public static final byte HEAD_CLIENT = 0x02;
+    public static final byte CLIENT_QUERY_PWD = 0x01;
+    public static final byte CLIENT_UPDATE_PWD = 0x02;
+    public static final byte CLIENT_CREATE_FILE = 0x03;
+    public static final byte CLIENT_DELETE_FILE = 0x04;
+    public static final byte CLIENT_UPDATE_FILE = 0x05;
+    public static final byte CLIENT_READ_FILE = 0x06;
 }

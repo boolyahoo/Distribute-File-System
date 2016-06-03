@@ -38,31 +38,33 @@ public class ServerMessageHandler extends SimpleChannelInboundHandler<String> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, String message) throws Exception {
+        out.println("message thread ID " + Thread.currentThread().getId());
         Channel incoming = ctx.channel();
         out.println("message:" + message);
+        for(Channel channel : slaves){
+            channel.writeAndFlush(message + "\n");
+        }
         byte type = message.getBytes()[0];
-        switch (type){
+        switch (type) {
             case MSG.HEAD_CLIENT:
-            for(Channel channel : allChannels){
-                if(channel == incoming){
-                    allChannels.remove(channel);
-                    clients.add(channel);
-                    break;
-                }
-            }
-            break;
-            case MSG.HEAD_SLAVE:
-                for(Channel channel : slaves){
-                    if(channel == incoming)
+                for (Channel channel : allChannels) {
+                    if (channel == incoming) {
+                        allChannels.remove(channel);
+                        clients.add(channel);
                         break;
+                    }
                 }
-                for(Channel channel : allChannels){
-                    if(channel == incoming){
+                incoming.writeAndFlush("/home/xcoder" + "\n");
+                break;
+            case MSG.HEAD_SLAVE:
+                for (Channel channel : allChannels) {
+                    if (channel == incoming) {
                         allChannels.remove(channel);
                         slaves.add(channel);
                         break;
                     }
                 }
+                incoming.writeAndFlush("slave registered" + "\n");
                 break;
             default:
                 break;

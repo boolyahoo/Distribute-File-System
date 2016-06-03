@@ -12,13 +12,14 @@ import java.io.PrintStream;
 
 
 public class SlaveMessageHandler extends SimpleChannelInboundHandler<String> {
-
     private PrintStream out = System.out;
 
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, String s) throws Exception {
-        out.println(s);
+    protected void channelRead0(ChannelHandlerContext ctx, String message) throws Exception {
+        out.println("message thread ID : " + Thread.currentThread().getId());
+        out.println(message);
+        Channel channel = ctx.channel();
     }
 
 
