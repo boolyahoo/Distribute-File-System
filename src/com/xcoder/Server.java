@@ -16,7 +16,6 @@ import java.io.PrintStream;
 
 public class Server {
     private static PrintStream out = System.out;
-    // port for master node
     public static final int port = 8080;
     public static final String host = "localhost";
     public static boolean isMaster = true;
@@ -26,7 +25,7 @@ public class Server {
         parseArgs(args);
         if (isMaster) {
             initAsMaster();
-        }else{
+        } else {
             initAsSlave();
         }
     }
@@ -55,7 +54,7 @@ public class Server {
     }
 
 
-    private void initAsSlave(){
+    private void initAsSlave() {
         out.println("current node:slave");
         EventLoopGroup group = new NioEventLoopGroup();
         try {
@@ -64,7 +63,9 @@ public class Server {
                     .channel(NioSocketChannel.class)
                     .handler(new SlaveInitializer());
             Channel channel = bStrap.connect(host, port).sync().channel();
-            ChannelFuture cFuture = channel.writeAndFlush("slave test" + "\r\n");
+            //向master发送第一条信息，表名自己是slave
+            byte type[] = {MSG.HEAD_SLAVE};
+            ChannelFuture cFuture = channel.writeAndFlush(new String(type) + "\n");
             cFuture.addListener(new ChannelFutureListener() {
                 public void operationComplete(ChannelFuture future) throws Exception {
                     out.println("slave started successfully!");

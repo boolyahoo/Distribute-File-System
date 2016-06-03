@@ -6,6 +6,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.util.concurrent.GlobalEventExecutor;
+import io.netty.util.internal.IntegerHolder;
 
 import java.io.PrintStream;
 
@@ -40,25 +41,25 @@ public class ServerMessageHandler extends SimpleChannelInboundHandler<String> {
         Channel incoming = ctx.channel();
         out.println("message:" + message);
         byte type = message.getBytes()[0];
-        switch (type & 0x0FF){
+        switch (type){
             case MSG.HEAD_CLIENT:
-                for(Channel channel : allChannels){
-                    if(channel == incoming){
-                        allChannels.remove(channel);
-                        clients.add(channel);
-                        out.println("allChannels size :" + allChannels.size());
-                        out.println("clients size :" + clients.size());
-                        break;
-                    }
+            for(Channel channel : allChannels){
+                if(channel == incoming){
+                    allChannels.remove(channel);
+                    clients.add(channel);
+                    break;
                 }
-                break;
+            }
+            break;
             case MSG.HEAD_SLAVE:
+                for(Channel channel : slaves){
+                    if(channel == incoming)
+                        break;
+                }
                 for(Channel channel : allChannels){
                     if(channel == incoming){
                         allChannels.remove(channel);
                         slaves.add(channel);
-                        out.println("allChannels size :" + allChannels.size());
-                        out.println("slaves size :" + slaves.size());
                         break;
                     }
                 }
@@ -79,8 +80,7 @@ public class ServerMessageHandler extends SimpleChannelInboundHandler<String> {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        Channel incoming = ctx.channel();
-        out.println(incoming.remoteAddress() + ":offline");
+        //
     }
 
 
