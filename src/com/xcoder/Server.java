@@ -6,10 +6,7 @@ package com.xcoder;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
@@ -85,7 +82,6 @@ public class Server {
          * command line
          * -m : set current server runs as a master node
          * -s : set current server runs as a slave node
-         * -p : current server port
          * */
         Options opts = new Options();
         opts.addOption("h", false, "help info");

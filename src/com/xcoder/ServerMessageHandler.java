@@ -16,59 +16,71 @@ import java.io.PrintStream;
  */
 
 public class ServerMessageHandler extends SimpleChannelInboundHandler<String> {
-    public static ChannelGroup channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+    public static ChannelGroup allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+    public static ChannelGroup slaves = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+    public static ChannelGroup clients = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
     private PrintStream out = System.out;
 
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-        Channel incoming = ctx.channel();
-        for (Channel channel : channels) {
-            channel.writeAndFlush("[SERVER] - " + incoming.remoteAddress() + " join\n");
-        }
-        //连接建立后将当前channel加入channels
-        channels.add(ctx.channel());
+        allChannels.add(ctx.channel());
+        out.println("allChannenls size :" + allChannels.size());
     }
 
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        Channel incoming = ctx.channel();
-        for (Channel channel : channels) {
-            channel.writeAndFlush("[SERVER] - " + incoming.remoteAddress() + " leave\n");
-        }
-        channels.remove(ctx.channel());
+        allChannels.remove(ctx.channel());
     }
 
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, String message) throws Exception {
         Channel incoming = ctx.channel();
-        out.println("client message:" + incoming.remoteAddress() + ":" + message);
-        for (Channel channel : channels) {
-            if (channel != incoming) {
-                channel.writeAndFlush("[" + incoming.remoteAddress() + "]" + message + "\n");
-            } else {
-                channel.writeAndFlush("[you]" + message + "\n");
-            }
+        byte type = message.getBytes()[0];
+        out.println("type : " + Integer.toBinaryString(type));
+        switch (type & 0x0FF){
+            case MSG.HEAD_CLIENT:
+                for(Channel channel : allChannels){
+                    if(channel == incoming){
+                        allChannels.remove(channel);
+                        clients.add(channel);
+                        out.println("allChannels size :" + allChannels.size());
+                        out.println("clients size :" + clients.size());
+                        break;
+                    }
+                }
+                break;
+            case MSG.HEAD_SLAVE:
+                for(Channel channel : allChannels){
+                    if(channel == incoming){
+                        allChannels.remove(channel);
+                        slaves.add(channel);
+                        out.println("allChannels size :" + allChannels.size());
+                        out.println("slaves size :" + slaves.size());
+                        break;
+                    }
+                }
+                break;
+            default:
+                break;
         }
-        if(message.contains("close")){
-            incoming.close();
-        }
+
     }
 
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         Channel incoming = ctx.channel();
-        out.println("Client:" + incoming.remoteAddress() + ":online");
+        out.println(incoming.remoteAddress() + ":online");
     }
 
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         Channel incoming = ctx.channel();
-        out.println("Client:" + incoming.remoteAddress() + ":offline");
+        out.println(incoming.remoteAddress() + ":offline");
     }
 
 

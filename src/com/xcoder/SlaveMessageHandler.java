@@ -23,6 +23,16 @@ public class SlaveMessageHandler extends SimpleChannelInboundHandler<String> {
 
 
     @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        Channel channel = ctx.channel();
+        out.println("channel active!");
+        out.println("channel remote address : " + channel.remoteAddress());
+        out.println("channel local address : " + channel.localAddress());
+        channel.writeAndFlush("slave");
+    }
+
+
+    @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         Channel incoming = ctx.channel();
         incoming.close();
