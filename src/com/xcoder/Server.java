@@ -9,11 +9,10 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-
-import java.io.PrintStream;
-
 import io.netty.channel.socket.nio.NioSocketChannel;
 import org.apache.commons.cli.*;
+
+import java.io.PrintStream;
 
 public class Server {
     private static PrintStream out = System.out;
@@ -64,8 +63,13 @@ public class Server {
                     .group(group)
                     .channel(NioSocketChannel.class)
                     .handler(new SlaveInitializer());
-            bStrap.connect(host, port).sync().channel();
-            out.println("slave started!");
+            Channel channel = bStrap.connect(host, port).sync().channel();
+            ChannelFuture cFuture = channel.writeAndFlush("slave test" + "\r\n");
+            cFuture.addListener(new ChannelFutureListener() {
+                public void operationComplete(ChannelFuture future) throws Exception {
+                    out.println("slave started successfully!");
+                }
+            });
         } catch (Exception e) {
             e.printStackTrace();
         }

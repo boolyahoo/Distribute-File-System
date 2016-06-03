@@ -38,8 +38,8 @@ public class ServerMessageHandler extends SimpleChannelInboundHandler<String> {
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, String message) throws Exception {
         Channel incoming = ctx.channel();
+        out.println("message:" + message);
         byte type = message.getBytes()[0];
-        out.println("type : " + Integer.toBinaryString(type));
         switch (type & 0x0FF){
             case MSG.HEAD_CLIENT:
                 for(Channel channel : allChannels){

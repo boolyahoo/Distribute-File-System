@@ -28,7 +28,6 @@ public class SlaveMessageHandler extends SimpleChannelInboundHandler<String> {
         out.println("channel active!");
         out.println("channel remote address : " + channel.remoteAddress());
         out.println("channel local address : " + channel.localAddress());
-        channel.writeAndFlush("slave");
     }
 
 
