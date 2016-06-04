@@ -8,90 +8,61 @@ import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import io.netty.util.internal.IntegerHolder;
 
-import java.io.PrintStream;
+import java.io.*;
+import java.net.Socket;
+import java.util.Date;
 
 /**
  * Created by xcoder on 2016/4/23.
- * 客户端的请求在这里处理
- * 一个函数处理一种请求
  */
 
-public class ServerMessageHandler extends SimpleChannelInboundHandler<String> {
-    public static ChannelGroup allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
-    public static ChannelGroup slaves = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
-    public static ChannelGroup clients = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
-    private PrintStream out = System.out;
+public class ServerMessageHandler implements Runnable {
+    private Socket client = null;
 
 
-    @Override
-    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-        allChannels.add(ctx.channel());
-        out.println("allChannenls size :" + allChannels.size());
+    public ServerMessageHandler(Socket client) {
+        this.client = client;
     }
 
 
-    @Override
-    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        allChannels.remove(ctx.channel());
-    }
+    public void run() {
+        BufferedReader in = null;
+        PrintWriter out = null;
+        try {
+            in = new BufferedReader(new InputStreamReader(this.client.getInputStream()));
+            out = new PrintWriter(this.client.getOutputStream(), true);
+            String currentTime = null;
+            String body = null;
+            while (true) {
+                body = in.readLine();
+                if (body == null)
+                    break;
+                System.out.println("server read order : " + body);
+                currentTime = "query time order".equalsIgnoreCase(body) ?
+                        (new Date(System.currentTimeMillis()).toString()) : ("bad order");
+                out.println(currentTime);
 
-
-    @Override
-    protected void channelRead0(ChannelHandlerContext ctx, String message) throws Exception {
-        out.println("message thread ID " + Thread.currentThread().getId());
-        Channel incoming = ctx.channel();
-        out.println("message:" + message);
-        for(Channel channel : slaves){
-            channel.writeAndFlush(message + "\n");
-        }
-        byte type = message.getBytes()[0];
-        switch (type) {
-            case MSG.HEAD_CLIENT:
-                for (Channel channel : allChannels) {
-                    if (channel == incoming) {
-                        allChannels.remove(channel);
-                        clients.add(channel);
-                        break;
-                    }
+            }
+        } catch (Exception e) {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
                 }
-                incoming.writeAndFlush("/home/xcoder" + "\n");
-                break;
-            case MSG.HEAD_SLAVE:
-                for (Channel channel : allChannels) {
-                    if (channel == incoming) {
-                        allChannels.remove(channel);
-                        slaves.add(channel);
-                        break;
-                    }
+            }
+            if (out != null) {
+                out.close();
+                out = null;
+            }
+            if (client != null) {
+                try {
+                    client.close();
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
                 }
-                incoming.writeAndFlush("slave registered" + "\n");
-                break;
-            default:
-                break;
+                client = null;
+            }
         }
-
-    }
-
-
-    @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        Channel incoming = ctx.channel();
-        out.println(incoming.remoteAddress() + ":online");
-    }
-
-
-    @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        //
-    }
-
-
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        Channel incoming = ctx.channel();
-        out.println("Client:" + incoming.remoteAddress() + ":exception");
-        // 当出现异常就关闭连接
-        cause.printStackTrace();
-        ctx.close();
     }
 }

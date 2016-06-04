@@ -4,37 +4,62 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
-import java.io.PrintStream;
+import java.io.*;
+import java.net.Socket;
+import java.util.Date;
 
 /**
  * Created by booly on 2016/5/26.
  */
 
 
-public class SlaveMessageHandler extends SimpleChannelInboundHandler<String> {
-    private PrintStream out = System.out;
+public class SlaveMessageHandler implements Runnable {
+    private Socket client = null;
 
 
-    @Override
-    protected void channelRead0(ChannelHandlerContext ctx, String message) throws Exception {
-        out.println("message thread ID : " + Thread.currentThread().getId());
-        out.println(message);
-        Channel channel = ctx.channel();
+    public SlaveMessageHandler(Socket client) {
+        this.client = client;
     }
 
 
-    @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        Channel channel = ctx.channel();
-        out.println("channel active!");
-        out.println("channel remote address : " + channel.remoteAddress());
-        out.println("channel local address : " + channel.localAddress());
-    }
+    public void run() {
+        BufferedReader in = null;
+        PrintWriter out = null;
+        try {
+            in = new BufferedReader(new InputStreamReader(this.client.getInputStream()));
+            out = new PrintWriter(this.client.getOutputStream(), true);
+            String currentTime = null;
+            String body = null;
+            while (true) {
+                body = in.readLine();
+                if (body == null)
+                    break;
+                System.out.println("server read order : " + body);
+                currentTime = "query time order".equalsIgnoreCase(body) ?
+                        (new Date(System.currentTimeMillis()).toString()) : ("bad order");
+                out.println(currentTime);
 
-
-    @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        Channel incoming = ctx.channel();
-        incoming.close();
+            }
+        } catch (Exception e) {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
+                }
+            }
+            if (out != null) {
+                out.close();
+                out = null;
+            }
+            if (client != null) {
+                try {
+                    client.close();
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
+                }
+                client = null;
+            }
+        }
     }
 }

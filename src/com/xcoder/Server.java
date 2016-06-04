@@ -4,15 +4,11 @@
 
 package com.xcoder;
 
-import io.netty.bootstrap.Bootstrap;
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import org.apache.commons.cli.*;
 
 import java.io.PrintStream;
+import java.net.ServerSocket;
+import java.net.Socket;
 
 public class Server {
     private static PrintStream out = System.out;
@@ -34,23 +30,20 @@ public class Server {
     private void initAsMaster() throws Exception {
         out.println("current node : master");
         out.println("port : " + port);
-        EventLoopGroup bossGroup = new NioEventLoopGroup();
-        EventLoopGroup workerGroup = new NioEventLoopGroup();
-        ServerBootstrap sBoot = new ServerBootstrap();
+        ServerSocket server = null;
         try {
-            sBoot.group(bossGroup, workerGroup)
-                    .channel(NioServerSocketChannel.class)
-                    .childHandler(new ServerInitializer())
-                    .option(ChannelOption.SO_BACKLOG, 128)
-                    .childOption(ChannelOption.SO_KEEPALIVE, true);
-            ChannelFuture cFuture = sBoot.bind(port).sync();
-            out.println("server started");
-            out.println("init master thread ID : " + Thread.currentThread().getId());
-            cFuture.channel().closeFuture().sync();
+            server = new ServerSocket(port);
+            Socket client = null;
+            while (true) {
+                client = server.accept();
+                new Thread(new ServerMessageHandler(client)).start();
+            }
+
         } finally {
-            workerGroup.shutdownGracefully();
-            bossGroup.shutdownGracefully();
-            out.println("server closed");
+            if (server != null) {
+                server.close();
+                server = null;
+            }
         }
     }
 
@@ -58,21 +51,7 @@ public class Server {
     private void initAsSlave() {
         out.println("current node : slave");
         out.println("init slave thread ID : " + Thread.currentThread().getId());
-        EventLoopGroup group = new NioEventLoopGroup();
-        try {
-            Bootstrap bStrap = new Bootstrap()
-                    .group(group)
-                    .channel(NioSocketChannel.class)
-                    .handler(new SlaveInitializer());
-            Channel channel = bStrap.connect(host, port).sync().channel();
-            //向master发送第一条信息，表明自己是slave
-            byte type[] = {MSG.HEAD_SLAVE};
-            //等待写操作完成
-            channel.writeAndFlush(new String(type) + "\n");
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
 
