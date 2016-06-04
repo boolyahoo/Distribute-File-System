@@ -6,10 +6,6 @@ package com.xcoder;
 
 import org.apache.commons.cli.*;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -41,6 +37,8 @@ public class Server {
                 client = server.accept();
                 new Thread(new ServerMessageHandler(client, System.currentTimeMillis())).start();
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         } finally {
             if (server != null) {
                 server.close();
@@ -53,44 +51,16 @@ public class Server {
     private void initAsSlave() {
         System.out.println("current node : slave");
         Socket socket = null;
-        BufferedReader socketIn = null;
-        PrintWriter socketOut = null;
         try {
             // 向master发起连接
             socket = new Socket(host, port);
-            socketIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            socketOut = new PrintWriter(socket.getOutputStream(), true);
-            // 向master发送消息表明自己是slave
-            byte message[] = {MSG.HEAD_SLAVE};
-            socketOut.println(new String(message));
-            String resp = socketIn.readLine();
-            System.out.println("message" + resp);
-
+            // 进入消息循环
+            new SlaveMessageHandler(socket).run();
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            if (socketIn != null) {
-                try {
-                    socketIn.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                socketIn = null;
-            }
-            if (socketOut != null) {
-                socketOut.close();
-                socketOut = null;
-            }
-            if (socket != null) {
-                try {
-                    socket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                socket = null;
-            }
+            SocketGroup.closeSocket(socket);
         }
-
     }
 
 
