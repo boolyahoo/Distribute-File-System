@@ -14,15 +14,21 @@ import java.util.Date;
 
 
 public class SlaveMessageHandler implements Runnable {
-    private Socket client = null;
+    private Socket client;
+    private long socketID;
+    private int type;
 
 
-    public SlaveMessageHandler(Socket client) {
+    public SlaveMessageHandler(Socket client, long socketID, int type) {
         this.client = client;
+        this.socketID = socketID;
+        this.type = type;
     }
 
 
     public void run() {
+        while(true){
 
+        }
     }
 }

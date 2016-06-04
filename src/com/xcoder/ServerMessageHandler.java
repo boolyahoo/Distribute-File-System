@@ -14,6 +14,8 @@ public class ServerMessageHandler implements Runnable {
     private Socket socket = null;
     private long socketID = 0;
     private int type;
+    private BufferedReader in;
+    private PrintWriter out;
 
 
 
@@ -24,28 +26,24 @@ public class ServerMessageHandler implements Runnable {
 
 
     public void run() {
-        BufferedReader in = null;
-        PrintWriter out = null;
-        System.out.println("socket address : " + socket.getLocalPort());
         try {
-            in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
-            out = new PrintWriter(this.socket.getOutputStream(), true);
-
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            out = new PrintWriter(socket.getOutputStream(), true);
             String body = null;
             while (true) {
                 body = in.readLine();
                 if (body == null)
                     break;
-                byte type = body.getBytes()[0];
+                type = body.getBytes()[0];
                 byte opType = body.getBytes()[1];
-                if(type == MSG.HEAD_CLIENT){
-                    this.type = MSG.HEAD_CLIENT;
-                    SocketGroup.addMSocket(socket, socketID, MSG.HEAD_CLIENT);
-                }
-                if(SocketGroup.getMsocket(socketID, MSG.HEAD_CLIENT) != null){
-                    System.out.println("add success");
-                }
+                SocketGroup.addMSocket(socket, socketID, type);
+                System.out.println("type : " + type);
                 switch (opType){
+                    case MSG.CLIENT_OP_DEFULT:
+                        //向其他slave转发消息
+                        String msg = new String(body.getBytes(), 2, body.getBytes().length - 2);
+                        SocketGroup.notifyAllSlave(msg);
+                        break;
                     case MSG.CLIENT_QUERY_PWD:
                         out.println("/home/xcoder");
                         break;
