@@ -6,12 +6,10 @@ package com.xcoder;
 
 import org.apache.commons.cli.*;
 
-import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 
 public class Server {
-    private static PrintStream out = System.out;
     public static final int port = 8080;
     public static final String host = "localhost";
     public static boolean isMaster = true;
@@ -28,17 +26,17 @@ public class Server {
 
 
     private void initAsMaster() throws Exception {
-        out.println("current node : master");
-        out.println("port : " + port);
+        System.out.println("current node : master");
+        System.out.println("port : " + port);
         ServerSocket server = null;
         try {
             server = new ServerSocket(port);
             Socket client = null;
             while (true) {
+                // 有新的连接进入，新建一个线程处理
                 client = server.accept();
-                new Thread(new ServerMessageHandler(client)).start();
+                new Thread(new ServerMessageHandler(client, System.currentTimeMillis())).start();
             }
-
         } finally {
             if (server != null) {
                 server.close();
@@ -49,9 +47,7 @@ public class Server {
 
 
     private void initAsSlave() {
-        out.println("current node : slave");
-        out.println("init slave thread ID : " + Thread.currentThread().getId());
-
+        System.out.println("current node : slave");
     }
 
 
@@ -86,7 +82,7 @@ public class Server {
                     }
                 }
             } else {
-                out.println("command line error");
+                System.out.println("command line error");
             }
         } catch (ParseException e) {
             e.printStackTrace();
