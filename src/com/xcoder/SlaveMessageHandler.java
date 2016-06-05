@@ -8,37 +8,29 @@ import java.net.Socket;
  */
 
 
-public class SlaveMessageHandler {
-    private Socket socket;
-    private BufferedReader sin = null;
-    private PrintWriter sout = null;
+public class SlaveMessageHandler implements Runnable{
+    private Socket Socket;
+    private BufferedReader In = null;
+    private PrintWriter Out = null;
 
 
     public SlaveMessageHandler(Socket socket) {
-        this.socket = socket;
+        this.Socket = socket;
     }
 
 
     public void run() {
+        // slave的消息处理线程负责socket通信，视需要选择是否阻塞，一般使用短连接，通信完成就关闭socket
         try {
-            sin = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            sout = new PrintWriter(socket.getOutputStream(), true);
-            // 向master发送消息表明自己是slave
-            byte message[] = {MSG.HEAD_SLAVE, MSG.SLAVE_REGISTER};
-            sout.println(new String(message));
-            while (true) {
-                // 从socket读数据，如果没有数据，当前线程会被挂起
-                String msg = sin.readLine();
-                System.out.println("server:" + msg);
-            }
+            In = new BufferedReader(new InputStreamReader(Socket.getInputStream()));
+            Out = new PrintWriter(Socket.getOutputStream(), true);
+            String msg = In.readLine();
+            System.out.println("message:" + msg);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            // 关闭流
-            Util.closeStream(sin, sout);
-            // 关闭socket
-            SocketGroup.closeSocket(socket);
+            Util.closeStream(In, Out);
+            Util.closeSocket(Socket);
         }
-
     }
 }
