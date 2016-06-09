@@ -34,19 +34,19 @@ public class MasterMessageHandler implements Runnable {
             In = new BufferedReader(new InputStreamReader(Socket.getInputStream()));
             Out = new PrintWriter(Socket.getOutputStream(), true);
             while (MsgLoopFlag) {
-                String message = In.readLine();
-                if (message == null) {
+                byte msg[] = In.readLine().getBytes();
+                if (msg == null) {
                     return;
                 }
-                System.out.println("message:" + message);
-                byte type = message.getBytes()[0];
+                System.out.println("message:" + msg);
+                byte type = msg[0];
                 // 分发消息
                 switch (type) {
                     case MSG.HEAD_CLIENT:
-                        handleClientMessage(message);
+                        handleClientMessage(msg);
                         break;
                     case MSG.HEAD_SLAVE:
-                        handlerSlaveMessage(message);
+                        handlerSlaveMessage(msg);
                         break;
                 }
             }
@@ -60,38 +60,44 @@ public class MasterMessageHandler implements Runnable {
         }
     }
 
-    private void handleClientMessage(String message) throws Exception {
-        if (message.length() < 2) {
+    private void handleClientMessage(byte msg[]) throws Exception {
+        if (msg.length < 2) {
             System.out.println("bad message body");
             return;
         }
-        byte opType = message.getBytes()[1];
+        byte opType = msg[1];
         switch (opType) {
             case MSG.CLIENT_REGISTER:
                 // 响应client注册请求，将client的socketID返回，作为client在系统中的ID
                 byte head[] = {MSG.HEAD_MASTER, MSG.MASTER_ACK};
-                Out.println(new String(head) + SocketID);
+                byte buf[] = new byte[8];
+                Util.getBytes(SocketID, buf, 0);
+                // TODO 删除调试输出
+                System.out.println("client id : " + SocketID );
+                Out.println(new String(head) + new String(buf));
                 break;
             case MSG.CLIENT_DEFAULT:
-                forwardClientMsgToSlave(message);
+                forwardClientMsgToSlave(msg);
                 break;
             case MSG.CLIENT_QUERY_PWD:
+
                 Out.println("/home/xcoder");
                 break;
         }
     }
 
-    private void handlerSlaveMessage(String message) {
-        if (message.length() < 2) {
+    private void handlerSlaveMessage(byte msg[]) {
+        if (msg.length < 2) {
             System.out.println("bad message body");
             return;
         }
-        byte opType = message.getBytes()[1];
+        byte opType = msg[1];
         switch (opType) {
             case MSG.SLAVE_REGISTER:
                 // 获取message的有效信息部分
-                int slavePort = Integer.parseInt(message.substring(2, message.length()));
+                int slavePort = (int)Util.parseNum(msg, 2, msg.length);
                 Server.addSlavePort(slavePort);
+                System.out.println("slave port : " + slavePort);
                 Out.println("register successfully");
                 // 设置当前线程不再从socket读取数据
                 MsgLoopFlag = false;
@@ -101,15 +107,16 @@ public class MasterMessageHandler implements Runnable {
         }
     }
 
-    private void forwardClientMsgToSlave(String message) {
-        String msg = new String(message.getBytes(), 2, message.getBytes().length - 2);
+
+    private void forwardClientMsgToSlave(byte msg[]) {
+        String data = new String(msg, 2, msg.length - 2);
         Socket s = null;
         PrintWriter out = null;
         try {
             // TODO 修改slave端口号
-            s = new Socket("localhost", 9000);
+            s = new Socket(Server.HOST, 9000);
             out = new PrintWriter(s.getOutputStream(), true);
-            out.println(msg);
+            out.println(data);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {

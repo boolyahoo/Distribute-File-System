@@ -17,6 +17,7 @@ public class Server {
     public static boolean IsMaster;
 
     private static List<Integer> SlavePorts = new LinkedList<Integer>();
+    //存储元数据的表
     private static Map<String, Integer> MetaTree;
 
 

@@ -85,6 +85,8 @@ public class Boot {
             socket = new Socket(Server.HOST, Server.MASTER_PORT);
             sout = new PrintWriter(socket.getOutputStream(), true);
             byte head[] = {MSG.HEAD_SLAVE, MSG.SLAVE_REGISTER};
+            byte buf[] = new byte[4];
+            Util.getBytes(Server.CurPort, buf, 0);
             sout.println(new String(head) + Server.CurPort);
             sin = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             String msg = sin.readLine();
