@@ -6,9 +6,7 @@ package com.xcoder;
 
 import org.apache.commons.cli.*;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -35,6 +33,8 @@ public class Boot {
         System.out.println("current node : master");
         System.out.println("port : " + Server.CurPort);
         ServerSocket server = null;
+        // Master初始化向MetaTree中添加一条文件目录起始点
+        Server.addMeta("/", -1);
         try {
             server = new ServerSocket(Server.CurPort);
             while (true) {
@@ -57,6 +57,8 @@ public class Boot {
         System.out.println("current node : slave");
         System.out.println("port : " + Server.CurPort);
         ServerSocket slave = null;
+        // slave初始化向MetaTree中添加一条文件目录起始点
+        Server.addMeta("/", -1);
         try {
             // 将slave初始化在9000监听
             slave = new ServerSocket(Server.CurPort);
@@ -79,38 +81,42 @@ public class Boot {
 
     private void registerSlave() {
         Socket socket = null;
-        BufferedReader sin = null;
-        PrintWriter sout = null;
+        InputStream in = null;
+        OutputStream out = null;
         try {
             socket = new Socket(Server.HOST, Server.MASTER_PORT);
-            sout = new PrintWriter(socket.getOutputStream(), true);
-            byte head[] = {MSG.HEAD_SLAVE, MSG.SLAVE_REGISTER};
-            byte buf[] = new byte[4];
-            Util.getBytes(Server.CurPort, buf, 0);
-            sout.println(new String(head) + Server.CurPort);
-            sin = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            String msg = sin.readLine();
-            System.out.println("server:" + msg);
+            out = socket.getOutputStream();
+            byte buf[] = new byte[6];
+            buf[0] = MSG.HEAD_SLAVE;
+            buf[1] = MSG.SLAVE_REGISTER;
+            Util.getBytes(Server.CurPort, buf, 2, buf.length);
+            out.write(buf, 0, buf.length);
+            out.flush();
+            in = socket.getInputStream();
+            byte rsp[] = new byte[128];
+            int len = in.read();
+            // TODO
+            System.out.println("server:" + new String(rsp, 0, len));
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            Util.closeStream(sin, sout);
+            Util.closeStream(in, out);
             Util.closeSocket(socket);
         }
     }
 
 
     /**
-     * parse args for current process
+     * 解析命令行参数
      *
-     * @param args : 命令行
+     * @param args : 命令行字符串数组
      */
     private void parseArgs(String args[]) {
         /**
          * command line
-         * -m : set current server runs as a master node
-         * -s : set current server runs as a slave node
-         * -p : port for current server to listen on
+         * -m : 设置当前进程角色为master
+         * -s : 设置当前进程角色为salve
+         * -p : 设置当前进程监听端口（master不需要这个参数，默认在8080端口监听）
          * */
         Options opts = new Options();
         opts.addOption("h", false, "help info");
@@ -123,7 +129,9 @@ public class Boot {
             cl = parser.parse(opts, args);
             if (cl.getOptions().length > 0) {
                 if (cl.hasOption('h')) {
-                    throw new Exception();
+                    HelpFormatter hf = new HelpFormatter();
+                    hf.printHelp("options", opts);
+                    System.exit(0);
                 } else {
                     if (cl.hasOption("m")) {
                         Server.IsMaster = true;
@@ -133,6 +141,7 @@ public class Boot {
                         if (!cl.hasOption("p")) {
                             throw new Exception();
                         }
+                        // TODO
                         System.out.println(cl.getOptionValue("p"));
                         Server.CurPort = Integer.parseInt(cl.getOptionValue("p"));
                     }
