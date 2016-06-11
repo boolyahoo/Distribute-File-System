@@ -67,4 +67,19 @@ public class Util {
         }
         return value;
     }
+
+
+    /**
+     * 将string用字节表示
+     *
+     * @param src:源字符串
+     * @param buf:存放字节的缓存
+     * @param begin:缓存开始的下标
+     */
+    public static void stringToBytes(String src, byte buf[], int begin) {
+        for (int i = 0; i < src.length(); i++) {
+            buf[begin + i] = (byte) src.charAt(i);
+        }
+    }
+
 }

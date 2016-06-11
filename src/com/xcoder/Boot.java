@@ -19,6 +19,11 @@ import java.net.Socket;
 public class Boot {
 
 
+    public static void main(String[] args) throws Exception {
+        new Boot().run(args);
+    }
+
+
     public void run(String args[]) throws Exception {
         parseArgs(args);
         if (Server.IsMaster) {
@@ -34,7 +39,7 @@ public class Boot {
         System.out.println("port : " + Server.CurPort);
         ServerSocket server = null;
         // Master初始化向MetaTree中添加一条文件目录起始点
-        Server.addMeta("/", -1);
+        Server.addMeta("/", MSG.FILE_DIR);
         try {
             server = new ServerSocket(Server.CurPort);
             while (true) {
@@ -58,7 +63,7 @@ public class Boot {
         System.out.println("port : " + Server.CurPort);
         ServerSocket slave = null;
         // slave初始化向MetaTree中添加一条文件目录起始点
-        Server.addMeta("/", -1);
+        Server.addMeta("/", MSG.FILE_DIR);
         try {
             // 将slave初始化在9000监听
             slave = new ServerSocket(Server.CurPort);
@@ -79,24 +84,36 @@ public class Boot {
     }
 
 
-    private void registerSlave() {
+    private void registerSlave() throws Exception{
+        /**
+         * 新的slave进程向master注册自己并同步master数据
+         *
+         * 发送消息格式：
+         * [Head(1B) OpType(1B) SlavePort(4B)]
+         *
+         * 接收消息格式：
+         * [Head(1B) Status(1B)]
+         *
+         * */
         Socket socket = null;
         InputStream in = null;
         OutputStream out = null;
+        byte buf[] = new byte[1024];
         try {
             socket = new Socket(Server.HOST, Server.MASTER_PORT);
             out = socket.getOutputStream();
-            byte buf[] = new byte[6];
             buf[0] = MSG.HEAD_SLAVE;
             buf[1] = MSG.SLAVE_REGISTER;
-            Util.getBytes(Server.CurPort, buf, 2, buf.length);
-            out.write(buf, 0, buf.length);
+            Util.getBytes(Server.CurPort, buf, 2, 2 + 4);
+            out.write(buf, 0, 6);
             out.flush();
             in = socket.getInputStream();
             byte rsp[] = new byte[128];
-            int len = in.read();
-            // TODO
-            System.out.println("server:" + new String(rsp, 0, len));
+            int len = in.read(buf, 0, buf.length);
+            if(len >= 2 && buf[1] == MSG.MASTER_ACK_OK){
+                System.out.println("slave register successfully, synchronizing data...");
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -161,8 +178,4 @@ public class Boot {
         }
     }
 
-
-    public static void main(String[] args) throws Exception {
-        new Boot().run(args);
-    }
 }

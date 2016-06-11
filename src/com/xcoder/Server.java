@@ -1,5 +1,9 @@
 package com.xcoder;
 
+import javax.swing.*;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Socket;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -18,8 +22,8 @@ public class Server {
     public static boolean IsMaster;
 
     private static List<Integer> SlavePorts = new LinkedList<Integer>();
-    // 存储元数据的列表，存储每个文件的绝对路径
-    private static List<String> MetaTree = new LinkedList<String>();
+    // 存储元数据的列表，存储每个文件的绝对路径和文件类型
+    private static Map<String, Integer> MetaTree = new HashMap<String, Integer>();
     // 存储每个Client的当前工作目录
     private static Map<Long, String> WorkingDir = new HashMap<Long, String>();
 
@@ -34,31 +38,168 @@ public class Server {
                 return;
         }
         SlavePorts.add(slavePort);
+        System.out.println("new slave join:" + slavePort);
     }
 
 
-    public static synchronized void addMeta(String fileName, long id){
-        for(String file : MetaTree){
-            if(file.equals("name"))
-                return;
+    public static synchronized void removeSlavePort(int slavePort) {
+        if (!Server.IsMaster) {
+            // 如果不是master角色，不可以操作SlavePorts数据
+            return;
         }
-        MetaTree.add(fileName);
+        for (int p : SlavePorts) {
+            if (p == slavePort) {
+                SlavePorts.remove(slavePort);
+                System.out.println("remove slave:" + slavePort);
+            }
+        }
+
     }
 
 
-    public static synchronized void updateWorkingDir(long id, String dir){
+    /**
+     * 向MetaTree中添加一个文件
+     *
+     * @param fileName：文件的绝对路径
+     * @param type：文件类型（普通文件或目录）
+     * @return 当文件已经存在时返回false
+     */
+    public static synchronized boolean addMeta(String fileName, int type) {
+        for (Map.Entry<String, Integer> entry : MetaTree.entrySet()) {
+            if (fileName.equals(entry.getKey())) {
+                return false;
+            }
+        }
+        MetaTree.put(fileName, type);
+        System.out.println("create file:" + fileName);
+        return true;
+    }
+
+
+    /**
+     * 检查文件是否存在
+     *
+     * @param fileName:文件的绝对路径
+     * @return 如果存在，返回文件类型；如果不存在，返回-1
+     */
+    public static int queryMeta(String fileName) {
+        for (Map.Entry<String, Integer> entry : MetaTree.entrySet()) {
+            if (fileName.equals(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return -1;
+    }
+
+
+    /**
+     * 更新client的工作目录
+     *
+     * @param id:client  id
+     * @param dir:新的工作目录
+     */
+    public static synchronized void updateWorkingDir(long id, String dir) {
         WorkingDir.put(id, dir);
     }
 
 
-    public static synchronized String queryWorkingDir(long id){
+    /**
+     * 查询client的工作目录
+     *
+     * @param id:client  id
+     */
+    public static synchronized String queryWorkingDir(long id) {
         for (Map.Entry<Long, String> entry : WorkingDir.entrySet()) {
-            if(entry.getKey() == id){
+            if (entry.getKey() == id) {
                 return entry.getValue();
             }
         }
         return null;
     }
+
+
+    /**
+     * 读取文件信息
+     *
+     * @param dirName:目录的绝对路径
+     * @return 返回文件名和类型（对于目录文件，返回一个列表）
+     */
+    public static List<String> readDir(String dirName) {
+        List<String> files = new LinkedList<String>();
+        for (Map.Entry<String, Integer> entry : MetaTree.entrySet()) {
+            String file = entry.getKey();
+            if (!file.equals(dirName) && file.contains(dirName))
+                files.add(file);
+        }
+        return files;
+    }
+
+
+    /**
+     * 删除文件
+     *
+     * @param fileName:文件的绝对路径
+     * @return 0:成功
+     */
+    public static int removeFile(String fileName) {
+        switch (queryMeta(fileName)) {
+            case MSG.FILE_COMN:
+                MetaTree.remove(fileName);
+                System.out.println("remove file:" + fileName);
+                break;
+            case MSG.FILE_DIR:
+                for (Map.Entry<String, Integer> entry : MetaTree.entrySet()) {
+                    String file = entry.getKey();
+                    if (file.equals(fileName)) {
+                        MetaTree.remove(file);
+                        System.out.println("remove file:" + file);
+                    }
+                }
+                break;
+        }
+        return MSG.SYNC_OK;
+    }
+
+
+    /**
+     * 删除失去联系的客户端
+     */
+    public static void removeClient(long id) {
+        for (Map.Entry<Long, String> entry : WorkingDir.entrySet()) {
+            if (entry.getKey() == id) {
+                WorkingDir.remove(id);
+                System.out.println("remove client:" + id);
+            }
+        }
+    }
+
+
+    /**
+     * 与slave同步master上的数据
+     * @param port：slave端口
+     * */
+    public static void syncDataWithSlave(int port) throws Exception{
+        /**
+         * 以创建文件的方式与slave同步数据
+         * 发送消息格式
+         * [Head(1B) OpType(1B) FileType(1B) FileName(variable)]
+         *
+         * 接收消息格式
+         * []
+         * */
+        byte buf[] = new byte[1024];
+        Socket s = new Socket("localhost", port);
+        InputStream in = s.getInputStream();
+        OutputStream out = s.getOutputStream();
+        for(Map.Entry<String, Integer> entry : MetaTree.entrySet()){
+            buf[0] = MSG.HEAD_MASTER;
+            buf[1] = MSG.MASTER_CREATE_FILE;
+
+        }
+
+    }
+
+
 
 
 }
