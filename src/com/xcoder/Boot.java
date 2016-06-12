@@ -92,7 +92,7 @@ public class Boot {
          * [Head(1B) OpType(1B) SlavePort(4B)]
          *
          * 接收消息格式：
-         * [Head(1B) Status(1B)]
+         * [Head(1B) OpType(1B) FileType(1B) FileName(variable)]
          *
          * */
         Socket socket = null;
@@ -102,16 +102,15 @@ public class Boot {
         try {
             socket = new Socket(Server.HOST, Server.MASTER_PORT);
             out = socket.getOutputStream();
+            in = socket.getInputStream();
             buf[0] = MSG.HEAD_SLAVE;
             buf[1] = MSG.SLAVE_REGISTER;
             Util.getBytes(Server.CurPort, buf, 2, 2 + 4);
             out.write(buf, 0, 6);
             out.flush();
-            in = socket.getInputStream();
-            byte rsp[] = new byte[128];
             int len = in.read(buf, 0, buf.length);
             if(len >= 2 && buf[1] == MSG.MASTER_ACK_OK){
-                System.out.println("slave register successfully, synchronizing data...");
+                System.out.println("register slave successfully! synchronizing data with master...");
             }
 
         } catch (Exception e) {

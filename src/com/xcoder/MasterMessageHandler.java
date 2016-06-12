@@ -1,8 +1,10 @@
 package com.xcoder;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -54,9 +56,10 @@ public class MasterMessageHandler implements Runnable {
             }
         } catch (Exception e) {
             // 出现异常，移除client
+            e.printStackTrace();
             Server.removeClient(SocketID);
         } finally {
-            // 出现异常，移除client
+            // 线程关闭，移除client
             Server.removeClient(SocketID);
             Util.closeStream(In, Out);
             Util.closeSocket(Socket);
@@ -74,9 +77,6 @@ public class MasterMessageHandler implements Runnable {
             case MSG.CLIENT_REGISTER:
                 handleClientRegister(len);
                 break;
-            case MSG.CLIENT_DEFAULT:
-                //forwardClientMsgToSlave(len);
-                break;
             case MSG.CLIENT_QUERY_PWD:
                 handleClientWorkingDirQuery(len);
                 break;
@@ -92,11 +92,13 @@ public class MasterMessageHandler implements Runnable {
             case MSG.CLIENT_DELETE_FILE:
                 handleClientDeleteFile(len);
                 break;
+            case MSG.CLIENT_DEFAULT:
+                break;
         }
     }
 
 
-    private void handlerSlaveMessage(int len) throws Exception{
+    private void handlerSlaveMessage(int len) throws Exception {
         if (len < 2) {
             System.out.println("bad message body");
             return;
@@ -112,19 +114,54 @@ public class MasterMessageHandler implements Runnable {
     }
 
 
-    private void forwardClientMsgToSlaves(int len) {
+    /**
+     * 将client的请求转发给所有的slave
+     *
+     * @param len：接收到的消息长度
+     * @param opType：消息类型
+     */
+    private void forwardClientMsgToSlaves(int len, byte opType) {
+        /**
+         * 将client的请求转发给所有的slave
+         *
+         * client创建文件请求格式：
+         * [Head(1B) OpType(1B) ClientID(8B) FileType(1B) FileName(variable)]
+         *
+         * client删除文件请求格式
+         * [Head(1B) OpType(1B) ClientID(8B)  FileName(variable)]
+         *
+         */
+
         Socket s = null;
         OutputStream out = null;
-        try {
-            // TODO 修改slave端口号
-            s = new Socket("localhost", 9000);
-            out = s.getOutputStream();
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            Util.closeStream(null, out);
-            Util.closeSocket(s);
+        InputStream in = null;
+        List<Integer> ports = Server.getSlavePorts();
+        List<Integer> fails = new LinkedList<Integer>();
+        byte buf[] = new byte[1024];
+        for (int port : ports) {
+            try {
+                // TODO 修改slave端口号
+                s = new Socket("localhost", port);
+                out = s.getOutputStream();
+                in = s.getInputStream();
+                //将client的请求转发
+                Msg[0] = MSG.HEAD_MASTER;
+                Msg[1] = opType;
+                out.write(Msg, 0, len);
+                out.flush();
+                in.read(buf, 0, buf.length);
+            } catch (Exception e) {
+                e.printStackTrace();
+                fails.add(port);
+            } finally {
+                Util.closeStream(null, out);
+                Util.closeSocket(s);
+            }
         }
+        for(int p : fails){
+            Server.removeSlave(p);
+        }
+
     }
 
 
@@ -132,18 +169,19 @@ public class MasterMessageHandler implements Runnable {
         /**
          * 接收消息格式：
          * [Head(1B) OpType(1B)]
+         *
          * 返回消息格式：
-         * [Head(1B) Status(1B) ClientID(8B)]
+         * [Head(1B) Status(1B) ClientID(8B) WorkingDir(variable)]
          * */
         System.out.println("new client:" + SocketID);
-        byte buf[] = new byte[10];
+        byte buf[] = new byte[1024];
         buf[0] = MSG.HEAD_MASTER;
         buf[1] = MSG.MASTER_ACK_OK;
-        Util.getBytes(SocketID, buf, 2, buf.length);
-        // TODO 删除调试输出
-        System.out.println("client id : " + SocketID);
+        Util.getBytes(SocketID, buf, 2, 2 + 8);
+        String workingDir = "/";
+        Util.stringToBytes(workingDir, buf, 10);
         Server.updateWorkingDir(SocketID, "/");
-        Out.write(buf, 0, buf.length);
+        Out.write(buf, 0, 10 + workingDir.length());
         Out.flush();
     }
 
@@ -177,6 +215,7 @@ public class MasterMessageHandler implements Runnable {
     private void handleClientWorkingDirUpdate(int len) throws Exception {
         /**
          * 将新的工作目录返回给client
+         * 接收到的消息为绝对路径表示, ..表示父目录，不需要绝对路径表示
          * 接收到消息格式：
          * [Head(1B) OpType(1B) ClientID(8B) TargetDir(variable)]
          * 返回消息格式：
@@ -188,7 +227,6 @@ public class MasterMessageHandler implements Runnable {
         String targetDir = new String(Msg, 10, len - 10);
         String curDir = Server.queryWorkingDir(clientID);
         String parentDir;
-        System.out.println("dir : " + targetDir);
         if (targetDir.equals("..")) {
             if (curDir.equals("/")) {
                 // 已经是根目录不做操作，返回
@@ -209,41 +247,20 @@ public class MasterMessageHandler implements Runnable {
                 }
             }
         } else {
-            if (targetDir.charAt(0) == '/') {
-                // 目标目录为绝对路径表示，检查目录是否存在
-                if (Server.queryMeta(targetDir) == MSG.FILE_DIR) {
-                    //如果存在，则更新工作目录，返回当前工作目录
-                    Server.updateWorkingDir(clientID, targetDir);
-                    buf[1] = MSG.MASTER_ACK_OK;
-                    Util.stringToBytes(targetDir, buf, 2);
-                    Out.write(buf, 0, 2 + targetDir.length());
-                } else {
-                    buf[1] = MSG.MASTER_ACK_FAIL;
-                    String msg = "error:target directory does not exist";
-                    Util.stringToBytes(msg, buf, 2);
-                    Out.write(buf, 0, 2 + msg.length());
-                }
+            // 检查目录是否存在
+            if (Server.queryMeta(targetDir) == MSG.FILE_DIR) {
+                //如果存在，则更新工作目录，返回当前工作目录
+                Server.updateWorkingDir(clientID, targetDir);
+                buf[1] = MSG.MASTER_ACK_OK;
+                Util.stringToBytes(targetDir, buf, 2);
+                Out.write(buf, 0, 2 + targetDir.length());
             } else {
-                //目标目录为当前工作目录下的目录
-                if (curDir.equals("/")) {
-                    targetDir = curDir + targetDir;
-                } else {
-                    targetDir = curDir + "/" + targetDir;
-                }
-                if (Server.queryMeta(targetDir) == MSG.FILE_DIR) {
-                    //目标目录存在
-                    Server.updateWorkingDir(clientID, targetDir);
-                    buf[1] = MSG.MASTER_ACK_OK;
-                    Util.stringToBytes(targetDir, buf, 2);
-                    Out.write(buf, 0, 2 + targetDir.length());
-                } else {
-                    buf[1] = MSG.MASTER_ACK_FAIL;
-                    String msg = "target directory does not exists or not a directory";
-                    Util.stringToBytes(msg, buf, 2);
-                    Out.write(buf, 0, 2 + msg.length());
-                }
-
+                buf[1] = MSG.MASTER_ACK_FAIL;
+                String msg = "error:target directory does not exist";
+                Util.stringToBytes(msg, buf, 2);
+                Out.write(buf, 0, 2 + msg.length());
             }
+
         }
         Out.flush();
     }
@@ -254,23 +271,17 @@ public class MasterMessageHandler implements Runnable {
          * 在当前工作目录下创建一个文件（目录）
          *
          * 接收消息格式：
-         * [Head(1B) OpType(1B) ClientID(8B) FileType(1B) DirName(variable)]
+         * [Head(1B) OpType(1B) ClientID(8B) FileType(1B) FileName(variable)]
+         * 文件为绝对路径表示
+         *
          * 返回的消息格式：
          * [Head(1B) Status(1B) Message(variable)]
          * */
-        byte buf[] = new byte[128];
+        byte buf[] = new byte[1024];
         long clientID = Util.parseNum(Msg, 2, 2 + 8);
         byte fileType = Msg[10];
         String fileName = new String(Msg, 11, len - 11);
-        String curDir = Server.queryWorkingDir(clientID);
-        if (curDir != null) {
-            if (curDir.equals("/")) {
-                fileName = curDir + fileName;
-            } else {
-                fileName = curDir + "/" + fileName;
-            }
-        }
-        System.out.println("create file name:" + fileName);
+        forwardClientMsgToSlaves(len, MSG.MASTER_CREATE_FILE);
         if (Server.addMeta(fileName, fileType)) {
             buf[0] = MSG.HEAD_MASTER;
             buf[1] = MSG.MASTER_ACK_OK;
@@ -294,6 +305,7 @@ public class MasterMessageHandler implements Runnable {
          *
          * 接收消息格式：
          * [Head(1B) OpType(1B) ClientID(8B) FileName(variable)]
+         * 文件名为绝对路径表示
          *
          * 返回的消息格式：
          * OK : [Head(1B) Status(1B) FileList]
@@ -327,6 +339,10 @@ public class MasterMessageHandler implements Runnable {
                 Out.write(buf, 0, index);
                 break;
             default:
+                buf[1] = MSG.MASTER_ACK_FAIL;
+                String msg = "error";
+                Util.stringToBytes(msg, buf, 2);
+                Out.write(buf, 0, 2 + msg.length());
                 break;
         }
         Out.flush();
@@ -339,6 +355,7 @@ public class MasterMessageHandler implements Runnable {
          *
          * 接收消息格式：
          * [Head(1B) OpType(1B) ClientID(8B) FileName(variable)]
+         * 文件名为绝对路径表示
          *
          * 返回的消息格式：
          * [Head(1B) Status(1B) Message(variable)]
@@ -346,8 +363,8 @@ public class MasterMessageHandler implements Runnable {
         byte buf[] = new byte[1024];
         buf[0] = MSG.HEAD_MASTER;
         long clientID = Util.parseNum(Msg, 2, 2 + 8);
-        String curDir = Server.queryWorkingDir(clientID);
         String fileName = new String(Msg, 10, len - 10);
+        forwardClientMsgToSlaves(len, MSG.MASTER_DELETE_FILE);
         switch (Server.removeFile(fileName)) {
             case MSG.SYNC_OK:
                 buf[1] = MSG.MASTER_ACK_OK;
@@ -374,34 +391,27 @@ public class MasterMessageHandler implements Runnable {
         byte buf[] = new byte[1024];
         int slavePort = (int) Util.parseNum(Msg, 2, 2 + 4);
         Server.addSlavePort(slavePort);
-        System.out.println("slave port : " + slavePort);
+        System.out.println("slave port:" + slavePort);
         // 设置当前线程不再从socket读取数据
         MsgLoopFlag = false;
         buf[0] = MSG.HEAD_MASTER;
         buf[1] = MSG.MASTER_ACK_OK;
         Out.write(buf, 0, 2);
         try {
+            // 关闭与slave的注册连接
             Out.close();
         } catch (Exception e) {
-            // 遇到异常，关闭与slave的链接
-            Server.removeSlavePort(slavePort);
+            // 遇到异常，移除slave
+            Server.removeSlave(slavePort);
         } finally {
-            // 在这里与slave同步数据
-            try{
+            try {
+                // 与slave同步数据
                 Server.syncDataWithSlave(slavePort);
-            }catch (Exception e){
-                // 出现异常
-                e.printStackTrace();
+            } catch (IOException e) {
+                // 如果抛出IO异常，移除slave
+                Server.removeSlave(slavePort);
             }
-
-
         }
     }
-
-
-    private void syncDataWithSlave() throws Exception{
-
-    }
-
 
 }
