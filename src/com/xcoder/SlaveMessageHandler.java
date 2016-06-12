@@ -51,7 +51,7 @@ public class SlaveMessageHandler implements Runnable {
     }
 
 
-    private void handleMasterCreateFile(int len) throws Exception{
+    private void handleMasterCreateFile(int len) throws Exception {
         /**
          * 接收消息格式
          * [Head(1B) OpType(1B) ID(8B) FileType(1B) FileName(variable)]
@@ -70,12 +70,11 @@ public class SlaveMessageHandler implements Runnable {
         buf[1] = MSG.SLAVE_ACK_OK;
         Out.write(buf, 0, 2);
         Out.flush();
-        // 设置消息循环停止
-        MsgLoopFlag = false;
+        //由发起连接的一方负责关闭连接
     }
 
 
-    private void handleMasterDeleteFile(int len) throws Exception{
+    private void handleMasterDeleteFile(int len) throws Exception {
         /**
          * 接收消息格式：
          *
@@ -91,8 +90,7 @@ public class SlaveMessageHandler implements Runnable {
         buf[1] = MSG.SLAVE_ACK_OK;
         Out.write(buf, 0, 2);
         Out.flush();
-        // 设置消息循环停止
-        MsgLoopFlag = false;
+        //由发起连接的一方负责关闭连接
     }
 
 

@@ -48,9 +48,10 @@ public class Server {
             // 如果不是master角色，不可以操作SlavePorts数据
             return;
         }
-        for (int p : SlavePorts) {
+        for (int i = 0; i < SlavePorts.size(); i++) {
+            int p = SlavePorts.get(i);
             if (p == slavePort) {
-                SlavePorts.remove(slavePort);
+                SlavePorts.remove(i);
                 System.out.println("remove slave:" + slavePort);
             }
         }
